@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Калькуляторы себестоимости</title>
+<style>
+  :root{
+    --bg:#0f172a; --card:#1e293b; --card2:#273449; --text:#e2e8f0;
+    --muted:#94a3b8; --accent:#38bdf8; --accent2:#22c55e; --border:#334155;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    background:linear-gradient(160deg,#0b1120,#0f172a 40%,#111c33);color:var(--text);
+    min-height:100vh;padding:24px 16px 64px}
+  .wrap{max-width:1100px;margin:0 auto}
+  h1{font-size:1.5rem;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:.9rem;margin-bottom:18px}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+  .tab{padding:9px 16px;border-radius:10px;border:1px solid var(--border);
+    background:var(--card);color:var(--muted);cursor:pointer;font-size:.9rem;transition:.15s}
+  .tab.active{background:var(--accent);color:#0b1120;border-color:var(--accent);font-weight:600}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:860px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:18px 18px 14px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  .card h2{font-size:1rem;margin:0 0 14px;display:flex;align-items:center;gap:8px}
+  .card h2 .dot{width:9px;height:9px;border-radius:50%;background:var(--accent)}
+  .card.aux h2 .dot{background:#a78bfa}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:9px}
+  .row label{font-size:.85rem;color:var(--muted);flex:1;display:flex;align-items:center;gap:6px}
+  
+  /* ПОЛЕ ВВОДА - убираем стрелки и даем воздух */
+  .row input[type=number]{
+    width:130px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);
+    background:var(--card2);color:var(--text);font-size:.9rem;text-align:right;outline:none;transition:border-color .15s;
+    -moz-appearance: textfield; /* Firefox */
+  }
+  .row input[type=number]::-webkit-outer-spin-button,
+  .row input[type=number]::-webkit-inner-spin-button {
+    -webkit-appearance: none; /* Chrome, Safari, Edge */
+    margin: 0;
+  }
+  .row input[type=number]:focus{border-color:var(--accent)}
+  
+  .row .unit{width:54px;font-size:.78rem;color:var(--muted);text-align:left}
+  .switch{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:.9rem;color:var(--muted)}
+  .switch input{width:18px;height:18px;accent-color:var(--accent2);cursor:pointer}
+  .results{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:24px 0 18px}
+  @media(max-width:860px){.results{grid-template-columns:1fr}}
+  .res{background:linear-gradient(145deg,#1e293b,#172033);border:1px solid var(--border);
+    border-radius:14px;padding:16px 18px}
+  .res .label{font-size:.8rem;color:var(--muted);margin-bottom:6px}
+  .res .value{font-size:1.45rem;font-weight:700;color:var(--accent)}
+  .res.green .value{color:var(--accent2)}
+  details{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+  summary{cursor:pointer;padding:16px 18px;font-weight:600;font-size:.95rem;list-style:none;
+    display:flex;justify-content:space-between;align-items:center;user-select:none}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"▾";color:var(--muted);transition:transform .2s}
+  details[open] summary::after{transform:rotate(180deg)}
+  .details-body{padding:0 18px 18px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:860px){.details-body{grid-template-columns:1fr}}
+  table{width:100%;border-collapse:collapse;font-size:.85rem}
+  table caption{text-align:left;color:var(--muted);font-size:.8rem;padding-bottom:8px}
+  th,td{padding:7px 4px;border-bottom:1px solid var(--border);text-align:left}
+  td:last-child,th:last-child{text-align:right;font-variant-numeric:tabular-nums}
+  th{color:var(--muted);font-weight:500}
+  tr.total td{font-weight:700;color:var(--accent);border-bottom:none}
+  .disabled{opacity:.4;pointer-events:none}
+  .hint{font-size:.75rem;color:var(--muted);margin-top:12px}
+
+  /* ===== Иконка «?» и тултип ===== */
+  .help{
+    position:relative;display:inline-flex;align-items:center;justify-content:center;
+    width:16px;height:16px;border-radius:50%;border:1px solid var(--border);
+    background:var(--card2);color:var(--muted);font-size:11px;font-weight:700;
+    cursor:help;flex:none;line-height:1;
+  }
+  .help:hover,.help:focus{border-color:var(--accent);color:var(--accent);outline:none}
+  .help .tip{
+    position:absolute;z-index:50;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+    min-width:200px;max-width:280px;padding:9px 11px;border-radius:8px;
+    background:#0b1120;border:1px solid var(--accent);color:var(--text);
+    font-size:.78rem;font-weight:400;line-height:1.35;text-align:left;
+    box-shadow:0 8px 24px rgba(0,0,0,.4);
+    opacity:0;visibility:hidden;transition:opacity .15s;pointer-events:none;
+  }
+  .help .tip::after{ /* стрелочка */
+    content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
+    border:6px solid transparent;border-top-color:var(--accent);
+  }
+  .help.show .tip{opacity:1;visibility:visible}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Калькуляторы себестоимости</h1>
+  <div class="sub">Выберите процесс — данные, формулы и результаты переключатся</div>
+
+  <div class="tabs" id="tabs"></div>
+  <div id="app"></div>
+</div>
+
+<script>
+const VAT = 1.22;
+const DEMAND = 0.7;
+const SALARY_TAX = 1.3;
+const fmt = v => (isFinite(v) ? v : 0).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+const helpers = {
+  perHour: (monthly, hours) => hours ? monthly/hours : 0,
+  amort: (cost, life, hours) => (life && hours) ? cost/life/hours : 0,
+  energy: (power, tariff) => power * DEMAND * tariff,
+  rent: (area, rate, hours) => hours ? area*rate/hours : 0,
+};
+
+/* ---------- ЛАЗЕРНАЯ РЕЗКА ---------- */
+const laserConfig = {
+  id: 'laser',
+  title: 'Лазерная резка',
+  subtitle: 'Оптоволоконный лазер SF6015HM · сталь 1 мм',
+  aux: {
+    key: 'useAux',
+    label: 'Учитывать компрессор',
+    fields: [
+      {key:'compCost',  label:'Стоимость компрессора',        unit:'руб.',    def:510720, hint:'Цена компрессора. Влияет на амортизацию и, через неё, на себестоимость часа.'},
+      {key:'compLife',  label:'Срок службы',                  unit:'мес.',    def:60,     hint:'Нормативный срок службы компрессора в месяцах. Амортизация = стоимость / срок / время.'},
+      {key:'compPower', label:'Мощность компрессора',         unit:'кВт/ч',   def:15,     hint:'Потребляемая мощность. Электроэнергия = мощность × 0,7 (коэфф. спроса) × тариф.'},
+      {key:'compHours', label:'Плановое время работы',        unit:'ч',       def:80,     hint:'Плановое время работы в смену/месяц. Делитель для всех «за месяц».'},
+      {key:'compMaint', label:'Затраты на обслуживание (ТОиР)',unit:'руб./мес',def:5000,   hint:'Ежемесячные расходы на обслуживание и ремонт компрессора.'},
+      {key:'compArea',  label:'Площадь аренды',               unit:'м²',      def:5,      hint:'Площадь под компрессор. Аренда = площадь × ставка / плановое время.'},
+    ],
+  },
+  main: [
+    {key:'cost',    label:'Стоимость станка',              unit:'руб.',    def:7786626.53, hint:'Цена лазерного станка. Амортизация = стоимость / срок / плановое время.'},
+    {key:'life',    label:'Срок службы',                   unit:'мес.',    def:120,         hint:'Нормативный срок службы станка в месяцах.'},
+    {key:'power',   label:'Мощность станка',               unit:'кВт/ч',   def:35,          hint:'Потребляемая мощность. Электроэнергия = мощность × 0,7 × тариф.'},
+    {key:'hours',   label:'Плановое время работы (смена)', unit:'ч',       def:160,         hint:'Плановое время работы в смену/месяц. Делитель для затрат «за месяц».'},
+    {key:'prod',    label:'Средняя производительность',    unit:'м/ч',     def:600,         hint:'Сколько погонных метров реза в час. Стоимость метра = себестоимость часа / производительность.'},
+    {key:'energy',  label:'Электроэнергия',                unit:'кВт/ч',   def:9.23,        hint:'Тариф на электроэнергию, руб. за кВт·ч.'},
+    {key:'tool',    label:'Затраты на инструмент',         unit:'руб./мес',def:5000,        hint:'Ежемесячные расходы на расходники/инструмент (сопла, линзы и т.п.).'},
+    {key:'maint',   label:'Затраты на обслуживание (ТОиР)',unit:'руб./мес',def:20000,       hint:'Ежемесячные расходы на ТО и ремонт станка.'},
+    {key:'salary',  label:'Оплата труда оператора (грязными)',unit:'руб./мес',def:90000,     hint:'Оклад «грязными». В расчёте умножается на 1,3 (страховые взносы 30%).'},
+    {key:'area',    label:'Площадь аренды',                unit:'м²',      def:100,         hint:'Площадь под станок. Аренда = площадь × ставка / плановое время.'},
+    {key:'rent',    label:'Стоимость аренды',              unit:'руб./м²', def:500,         hint:'Ставка аренды за м² в месяц.'},
+    {key:'overhead',label:'Накладные расходы',             unit:'%',       def:100,         hint:'Процент от прямых затрат. 100% = накладные равны прямым.'},
+  ],
+  compute(v){
+    const h = helpers;
+    let auxDirect=0, auxNoVat=0;
+    if (v.useAux){
+      const dep = h.amort(v.compCost, v.compLife, v.compHours);
+      const en  = h.energy(v.compPower, v.energy);
+      const mt  = h.perHour(v.compMaint, v.compHours);
+      const rt  = h.rent(v.compArea, v.rent, v.compHours);
+      auxDirect = dep+en+mt+rt;
+      auxNoVat  = auxDirect * (1 + v.overhead/100);
+    }
+    const dep = h.amort(v.cost, v.life, v.hours);
+    const en  = h.energy(v.power, v.energy);
+    const tl  = h.perHour(v.tool, v.hours);
+    const mt  = h.perHour(v.maint, v.hours);
+    const sal = h.perHour(v.salary*SALARY_TAX, v.hours);
+    const rt  = h.rent(v.area, v.rent, v.hours);
+    const direct = dep+en+tl+mt+sal+rt;
+    const overhead = direct * (v.overhead/100);
+    const totalNoVat = direct + overhead + auxNoVat;
+    const totalVat = totalNoVat * VAT;
+    const meterNoVat = v.prod ? totalNoVat / v.prod : 0;
+    const meterVat = v.prod ? totalVat / v.prod : 0;
+    return {
+      cards:[
+        {label:'Полная себестоимость часа без НДС', value:totalNoVat, unit:'₽/ч'},
+        {label:'Стоимость 1 погонного метра без НДС (по себестоимости)', value:meterNoVat, unit:'₽/м.п.'},
+        {label:'Полная себестоимость часа с НДС', value:totalVat, unit:'₽/ч', green:true},
+        {label:'Стоимость 1 погонного метра с НДС (по себестоимости)', value:meterVat, unit:'₽/м.п.', green:true},
+      ],
+      auxRows:[
+        ['Амортизация', dep],['Электроэнергия (0,7)', en],['Обслуживание (ТОиР)', mt],
+        ['Аренда помещения', rt],['Итого прямые', auxDirect, 'total'],
+        ['Накладные расходы', auxDirect*v.overhead/100],
+        ['Себестоимость часа без НДС', auxNoVat, 'total'],
+        ['Себестоимость часа с НДС', auxNoVat*VAT, 'total'],
+      ],
+      mainRows:[
+        ['Амортизация', dep],['Электроэнергия (0,7)', en],['Инструмент', tl],
+        ['Обслуживание (ТОиР)', mt],['Оплата труда (×1,3)', sal],['Аренда помещения', rt],
+        ['Итого прямые', direct, 'total'],['Накладные расходы', overhead],
+        ['Себестоимость часа без НДС (с компрессором)', totalNoVat, 'total'],
+        ['Стоимость 1 п.м. без НДС', meterNoVat, 'total'],
+        ['Себестоимость часа с НДС', totalVat, 'total'],
+        ['Стоимость 1 п.м. с НДС', meterVat, 'total'],
+      ],
+    };
+  },
+};
+
+const CONFIGS = [laserConfig];
+let current = CONFIGS[0];
+
+function renderTabs(){
+  const wrap = document.getElementById('tabs');
+  wrap.innerHTML = '';
+  CONFIGS.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'tab' + (c === current ? ' active' : '');
+    b.textContent = c.title;
+    b.onclick = () => { current = c; renderAll(); };
+    wrap.appendChild(b);
+  });
+}
+
+function renderApp(){
+  const cfg = current;
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="sub" style="margin-bottom:16px">${cfg.subtitle}</div>
+    <div class="grid">
+      <div class="card">
+        <h2><span class="dot"></span>Исходные данные</h2>
+        <div id="mainFields"></div>
+      </div>
+      ${cfg.aux ? `
+      <div class="card aux" id="auxCard">
+        <h2><span class="dot"></span>Вспомогательное оборудование</h2>
+        <div class="switch">
+          <input type="checkbox" id="useAux" checked>
+          <label for="useAux">${cfg.aux.label}</label>
+        </div>
+        <div id="auxFields"></div>
+      </div>` : ''}
+    </div>
+
+    <div class="results" id="cards"></div>
+
+    <details>
+      <summary>Подробнее — разбивка затрат</summary>
+      <div class="details-body" id="detailsBody"></div>
+      <div class="hint" style="padding:0 18px 18px">
+        Амортизация = стоимость / срок / время; электроэнергия = мощность × 0,7 × тариф;
+        ТОиР = затраты / время; аренда = площадь × ставка / время; накладные = % от прямых;
+        оплата труда = оклад × 1,3 / время; НДС = 22%.
+      </div>
+    </details>
+  `;
+
+  const mainDiv = document.getElementById('mainFields');
+  cfg.main.forEach(f => mainDiv.appendChild(makeRow(f, cfg.id)));
+
+  if (cfg.aux){
+    const auxDiv = document.getElementById('auxFields');
+    cfg.aux.fields.forEach(f => auxDiv.appendChild(makeRow(f, cfg.id)));
+    document.getElementById('useAux').addEventListener('change', e => {
+      auxDiv.classList.toggle('disabled', !e.target.checked);
+      recalc();
+    });
+  }
+  recalc();
+}
+
+/* ---------- Строка ввода с «?» ---------- */
+function makeRow(f, cfgId){
+  const row = document.createElement('div');
+  row.className = 'row';
+  const id = `${cfgId}_${f.key}`;
+
+  // подпись + иконка
+  const label = document.createElement('label');
+  label.setAttribute('for', id);
+  label.textContent = f.label;
+  if (f.hint){
+    const help = document.createElement('span');
+    help.className = 'help';
+    help.tabIndex = 0;                 // фокус с клавиатуры
+    help.setAttribute('role','button');
+    help.setAttribute('aria-label','Пояснение: ' + f.label);
+    help.innerHTML = `?<span class="tip" role="tooltip">${f.hint}</span>`;
+    // показ по наведению/фокусу
+    const show = () => help.classList.add('show');
+    const hide = () => help.classList.remove('show');
+    help.addEventListener('mouseenter', show);
+    help.addEventListener('mouseleave', hide);
+    help.addEventListener('focus', show);
+    help.addEventListener('blur', hide);
+    // для тач-устройств: клик переключает
+    help.addEventListener('click', e => {
+      e.preventDefault();
+      const isOpen = help.classList.contains('show');
+      // закрываем все остальные
+      document.querySelectorAll('.help.show').forEach(el => el.classList.remove('show'));
+      if (!isOpen) help.classList.add('show');
+    });
+    label.appendChild(help);
+  }
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.id = id;
+  input.dataset.key = f.key;
+  input.value = f.def;
+  input.step = 'any';
+  input.addEventListener('input', recalc);
+
+  const unit = document.createElement('span');
+  unit.className = 'unit';
+  unit.textContent = f.unit;
+
+  row.append(label, input, unit);
+  return row;
+}
+
+function collectValues(){
+  const cfg = current;
+  const v = {};
+  cfg.main.forEach(f => {
+    v[f.key] = parseFloat(document.getElementById(`${cfg.id}_${f.key}`).value) || 0;
+  });
+  if (cfg.aux){
+    cfg.aux.fields.forEach(f => {
+      v[f.key] = parseFloat(document.getElementById(`${cfg.id}_${f.key}`).value) || 0;
+    });
+    v.useAux = document.getElementById('useAux').checked;
+  }
+  return v;
+}
+
+function recalc(){
+  const cfg = current;
+  const v = collectValues();
+  const res = cfg.compute(v);
+
+  document.getElementById('cards').innerHTML = res.cards.map(c => `
+    <div class="res ${c.green ? 'green' : ''}">
+      <div class="label">${c.label}</div>
+      <div class="value">${fmt(c.value)} ${c.unit}</div>
+    </div>
+  `).join('');
+
+  const body = document.getElementById('detailsBody');
+  body.innerHTML = '';
+  const makeTable = (caption, rows) => {
+    const t = document.createElement('table');
+    t.innerHTML = `<caption>${caption}</caption><tbody>` +
+      rows.map(r => `<tr class="${r[2]||''}"><td>${r[0]}</td><td>${fmt(r[1])}</td></tr>`).join('') +
+      `</tbody>`;
+    return t;
+  };
+  if (res.auxRows) body.appendChild(makeTable('Вспомогательное оборудование, руб./ч', res.auxRows));
+  body.appendChild(makeTable('Основное оборудование, руб./ч', res.mainRows));
+}
+
+function renderAll(){ renderTabs(); renderApp(); }
+
+// клик вне иконок — закрыть тултипы
+document.addEventListener('click', e => {
+  if (!e.target.closest('.help')){
+    document.querySelectorAll('.help.show').forEach(el => el.classList.remove('show'));
+  }
+});
+
+renderAll();
+</script>
+</body>
+</html>
