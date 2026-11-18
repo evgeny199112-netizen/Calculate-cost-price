@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Калькуляторы себестоимости</title>
+<title>Калькулятор себестоимости</title>
 <style>
   :root{
     --bg:#0f172a; --card:#1e293b; --card2:#273449; --text:#e2e8f0;
@@ -95,7 +95,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Калькуляторы себестоимости</h1>
+  <h1>Калькулятор себестоимости</h1>
   <div class="sub">Выберите процесс — данные, формулы и результаты переключатся</div>
 
   <div class="tabs" id="tabs"></div>
@@ -104,14 +104,13 @@
 
 <script>
 const VAT = 1.22;
-const DEMAND = 0.7;
 const SALARY_TAX = 1.3;
 const fmt = v => (isFinite(v) ? v : 0).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
 
 const helpers = {
   perHour: (monthly, hours) => hours ? monthly/hours : 0,
   amort: (cost, life, hours) => (life && hours) ? cost/life/hours : 0,
-  energy: (power, tariff) => power * DEMAND * tariff,
+  energy: (power, usage, tariff) => power * usage * tariff,
   rent: (area, rate, hours) => hours ? area*rate/hours : 0,
 };
 
@@ -119,14 +118,13 @@ const helpers = {
 const laserConfig = {
   id: 'laser',
   title: 'Лазерная резка',
-  subtitle: 'Оптоволоконный лазер SF6015HM · сталь 1 мм',
   aux: {
     key: 'useAux',
     label: 'Учитывать компрессор',
     fields: [
       {key:'compCost',  label:'Стоимость компрессора',        unit:'руб.',    def:510720, hint:'Цена компрессора. Влияет на амортизацию и, через неё, на себестоимость часа.'},
       {key:'compLife',  label:'Срок службы',                  unit:'мес.',    def:60,     hint:'Нормативный срок службы компрессора в месяцах. Амортизация = стоимость / срок / время.'},
-      {key:'compPower', label:'Мощность компрессора',         unit:'кВт/ч',   def:15,     hint:'Потребляемая мощность. Электроэнергия = мощность × 0,7 (коэфф. спроса) × тариф.'},
+      {key:'compPower', label:'Мощность компрессора',         unit:'кВт/ч',   def:15,     hint:'Потребляемая мощность. Электроэнергия = мощность × коэффициент использования станка × тариф.'},
       {key:'compHours', label:'Плановое время работы',        unit:'ч',       def:80,     hint:'Плановое время работы в смену/месяц. Делитель для всех «за месяц».'},
       {key:'compMaint', label:'Затраты на обслуживание (ТОиР)',unit:'руб./мес',def:5000,   hint:'Ежемесячные расходы на обслуживание и ремонт компрессора.'},
       {key:'compArea',  label:'Площадь аренды',               unit:'м²',      def:5,      hint:'Площадь под компрессор. Аренда = площадь × ставка / плановое время.'},
@@ -135,13 +133,14 @@ const laserConfig = {
   main: [
     {key:'cost',    label:'Стоимость станка',              unit:'руб.',    def:7786626.53, hint:'Цена лазерного станка. Амортизация = стоимость / срок / плановое время.'},
     {key:'life',    label:'Срок службы',                   unit:'мес.',    def:120,         hint:'Нормативный срок службы станка в месяцах.'},
-    {key:'power',   label:'Мощность станка',               unit:'кВт/ч',   def:35,          hint:'Потребляемая мощность. Электроэнергия = мощность × 0,7 × тариф.'},
+    {key:'power',   label:'Мощность станка',               unit:'кВт/ч',   def:35,          hint:'Потребляемая мощность. Электроэнергия = мощность × коэффициент использования станка × тариф.'},
+    {key:'usage',   label:'Коэффициент использования станка', unit:'',      def:0.7,         hint:'Доля фактического использования от номинальной мощности (0…1). Влияет на расчёт электроэнергии.'},
     {key:'hours',   label:'Плановое время работы (смена)', unit:'ч',       def:160,         hint:'Плановое время работы в смену/месяц. Делитель для затрат «за месяц».'},
     {key:'prod',    label:'Средняя производительность',    unit:'м/ч',     def:600,         hint:'Сколько погонных метров реза в час. Стоимость метра = себестоимость часа / производительность.'},
     {key:'energy',  label:'Электроэнергия',                unit:'кВт/ч',   def:9.23,        hint:'Тариф на электроэнергию, руб. за кВт·ч.'},
     {key:'tool',    label:'Затраты на инструмент',         unit:'руб./мес',def:5000,        hint:'Ежемесячные расходы на расходники/инструмент (сопла, линзы и т.п.).'},
     {key:'maint',   label:'Затраты на обслуживание (ТОиР)',unit:'руб./мес',def:20000,       hint:'Ежемесячные расходы на ТО и ремонт станка.'},
-    {key:'salary',  label:'Оплата труда оператора (грязными)',unit:'руб./мес',def:90000,     hint:'Оклад «грязными». В расчёте умножается на 1,3 (страховые взносы 30%).'},
+    {key:'salary',  label:'Оплата труда оператора',        unit:'руб./мес',def:90000,       hint:'Оклад оператора за месяц. Не учитывает страховые взносы.'},
     {key:'area',    label:'Площадь аренды',                unit:'м²',      def:100,         hint:'Площадь под станок. Аренда = площадь × ставка / плановое время.'},
     {key:'rent',    label:'Стоимость аренды',              unit:'руб./м²', def:500,         hint:'Ставка аренды за м² в месяц.'},
     {key:'overhead',label:'Накладные расходы',             unit:'%',       def:100,         hint:'Процент от прямых затрат. 100% = накладные равны прямым.'},
@@ -151,17 +150,17 @@ const laserConfig = {
     let auxDirect=0, auxNoVat=0;
     if (v.useAux){
       const dep = h.amort(v.compCost, v.compLife, v.compHours);
-      const en  = h.energy(v.compPower, v.energy);
+      const en  = h.energy(v.compPower, v.usage, v.energy);
       const mt  = h.perHour(v.compMaint, v.compHours);
       const rt  = h.rent(v.compArea, v.rent, v.compHours);
       auxDirect = dep+en+mt+rt;
       auxNoVat  = auxDirect * (1 + v.overhead/100);
     }
     const dep = h.amort(v.cost, v.life, v.hours);
-    const en  = h.energy(v.power, v.energy);
+    const en  = h.energy(v.power, v.usage, v.energy);
     const tl  = h.perHour(v.tool, v.hours);
     const mt  = h.perHour(v.maint, v.hours);
-    const sal = h.perHour(v.salary*SALARY_TAX, v.hours);
+    const sal = h.perHour(v.salary, v.hours);
     const rt  = h.rent(v.area, v.rent, v.hours);
     const direct = dep+en+tl+mt+sal+rt;
     const overhead = direct * (v.overhead/100);
@@ -177,15 +176,15 @@ const laserConfig = {
         {label:'Стоимость 1 погонного метра с НДС (по себестоимости)', value:meterVat, unit:'₽/м.п.', green:true},
       ],
       auxRows:[
-        ['Амортизация', dep],['Электроэнергия (0,7)', en],['Обслуживание (ТОиР)', mt],
+        ['Амортизация', dep],['Электроэнергия (коэфф. использования)', en],['Обслуживание (ТОиР)', mt],
         ['Аренда помещения', rt],['Итого прямые', auxDirect, 'total'],
         ['Накладные расходы', auxDirect*v.overhead/100],
         ['Себестоимость часа без НДС', auxNoVat, 'total'],
         ['Себестоимость часа с НДС', auxNoVat*VAT, 'total'],
       ],
       mainRows:[
-        ['Амортизация', dep],['Электроэнергия (0,7)', en],['Инструмент', tl],
-        ['Обслуживание (ТОиР)', mt],['Оплата труда (×1,3)', sal],['Аренда помещения', rt],
+        ['Амортизация', dep],['Электроэнергия (коэфф. использования)', en],['Инструмент', tl],
+        ['Обслуживание (ТОиР)', mt],['Оплата труда', sal],['Аренда помещения', rt],
         ['Итого прямые', direct, 'total'],['Накладные расходы', overhead],
         ['Себестоимость часа без НДС (с компрессором)', totalNoVat, 'total'],
         ['Стоимость 1 п.м. без НДС', meterNoVat, 'total'],
@@ -215,7 +214,6 @@ function renderApp(){
   const cfg = current;
   const app = document.getElementById('app');
   app.innerHTML = `
-    <div class="sub" style="margin-bottom:16px">${cfg.subtitle}</div>
     <div class="grid">
       <div class="card">
         <h2><span class="dot"></span>Исходные данные</h2>
@@ -238,9 +236,9 @@ function renderApp(){
       <summary>Подробнее — разбивка затрат</summary>
       <div class="details-body" id="detailsBody"></div>
       <div class="hint" style="padding:0 18px 18px">
-        Амортизация = стоимость / срок / время; электроэнергия = мощность × 0,7 × тариф;
+        Амортизация = стоимость / срок / время; электроэнергия = мощность × коэффициент использования станка × тариф;
         ТОиР = затраты / время; аренда = площадь × ставка / время; накладные = % от прямых;
-        оплата труда = оклад × 1,3 / время; НДС = 22%.
+        оплата труда = оклад / время; НДС = 22%.
       </div>
     </details>
   `;
@@ -272,22 +270,19 @@ function makeRow(f, cfgId){
   if (f.hint){
     const help = document.createElement('span');
     help.className = 'help';
-    help.tabIndex = 0;                 // фокус с клавиатуры
+    help.tabIndex = 0;
     help.setAttribute('role','button');
     help.setAttribute('aria-label','Пояснение: ' + f.label);
     help.innerHTML = `?<span class="tip" role="tooltip">${f.hint}</span>`;
-    // показ по наведению/фокусу
     const show = () => help.classList.add('show');
     const hide = () => help.classList.remove('show');
     help.addEventListener('mouseenter', show);
     help.addEventListener('mouseleave', hide);
     help.addEventListener('focus', show);
     help.addEventListener('blur', hide);
-    // для тач-устройств: клик переключает
     help.addEventListener('click', e => {
       e.preventDefault();
       const isOpen = help.classList.contains('show');
-      // закрываем все остальные
       document.querySelectorAll('.help.show').forEach(el => el.classList.remove('show'));
       if (!isOpen) help.classList.add('show');
     });
@@ -352,7 +347,6 @@ function recalc(){
 
 function renderAll(){ renderTabs(); renderApp(); }
 
-// клик вне иконок — закрыть тултипы
 document.addEventListener('click', e => {
   if (!e.target.closest('.help')){
     document.querySelectorAll('.help.show').forEach(el => el.classList.remove('show'));
